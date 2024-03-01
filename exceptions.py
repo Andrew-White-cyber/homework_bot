@@ -1,4 +1,4 @@
-class MyException(Exception):
+class CustomException(Exception):
     """Кастомное исключение."""
 
     def __init__(self, *args):
