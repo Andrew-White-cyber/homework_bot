@@ -34,16 +34,13 @@ logger = logging.getLogger(__name__)
 
 def check_tokens():
     """Проверяем доступность токенов."""
-    if all([TELEGRAM_CHAT_ID, TELEGRAM_TOKEN, PRACTICUM_TOKEN]):
-        return False
-    else:
-        return True
+    return all([TELEGRAM_CHAT_ID, TELEGRAM_TOKEN, PRACTICUM_TOKEN])
 
 
 def send_message(bot, message):
     """Отправляем сообщение о статусе ДЗ."""
     try:
-        logger.debug(f'sending message "{message}"')
+        logger.debug(f'Отправка сообщения: "{message}"')
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
     except Exception as error:
         logger.error(error)
@@ -58,41 +55,47 @@ def get_api_answer(timestamp):
     try:
         homework_statuses = requests.get(url, headers=headers, params=payload)
     except requests.RequestException:
-        raise CustomException(f'Эндпоинт {url} не доступен!')
+        raise Exception(f'Эндпоинт {url} не доступен!')
     if homework_statuses.status_code != 200:
-        raise CustomException(f'Эндпоинт {url} не доступен!')
+        raise Exception(
+            f'Код ответа не 200, а {homework_statuses.status_code},'
+            f'причина: {homework_statuses.reason}'
+        )
     return homework_statuses.json()
 
 
 def check_response(response):
     """Проверяем формат ответа."""
     if not isinstance(response, dict):
-        raise TypeError(f'response is not dict, its {type(response)}')
-    if response.get('homeworks') is None:
+        raise TypeError(f'response не является словарём: {type(response)}')
+    if 'homeworks' not in response:
         raise TypeError('В API ответе отсутствует важный ключ!(homeworks)')
-    if not isinstance(response.get('homeworks'), list):
+    else:
         homeworks = response.get('homeworks')
+    if not isinstance(homeworks, list):
         raise TypeError(
-            f'Ключ homeworks возвращает не список, а {homeworks}'
+            f'Ключ homeworks возвращает не список, а {type(homeworks)}'
         )
     if response.get('current_date') is None:
         raise TypeError('В API ответе отсутствует важный ключ!(current_date)')
+    return response.get('homeworks')[0]
 
 
 def parse_status(homework):
     """Получаем статус домашней работы."""
     if not isinstance(homework, dict):
-        raise CustomException(f'homeworks is not dict, its {type(homework)}')
-    status = homework.get('status')
-    verdict = HOMEWORK_VERDICTS.get(status)
-    if (status is None
-            or status not in HOMEWORK_VERDICTS.keys()):
-        raise CustomException(f'status {status} is unknown!')
-    if verdict not in HOMEWORK_VERDICTS.values():
-        raise CustomException(f'verdict {verdict} is unknown!')
-    if homework.get('homework_name') is None:
-        raise CustomException('Отсутствует название ДЗ!')
-    homework_name = homework.get('homework_name')
+        raise TypeError(
+            f'homeworks не является словарём: {type(homework)}'
+        )
+    if 'status' not in homework:
+        raise KeyError('Ключ status отсутствует!')
+    status = homework['status']
+    if status not in HOMEWORK_VERDICTS:
+        raise KeyError('Неизвестное заключение о ДЗ!')
+    verdict = HOMEWORK_VERDICTS[status]
+    if 'homework_name' not in homework:
+        raise KeyError('Отсутствует название ДЗ!')
+    homework_name = homework['homework_name']
 
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
@@ -101,16 +104,13 @@ def main():
     """Основная логика работы бота."""
     if check_tokens():
         logger.critical('Отсутствуют токены!')
-        raise CustomException('Отсутствуют токены!')
-    else:
-        logger.debug('tokens fine!')
+        sys.exit('Отсутствуют токены!')
     bot = Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     while True:
         try:
             answer = get_api_answer(timestamp)
-            check_response(answer)
-            message = parse_status(answer.get('homeworks')[0])
+            message = parse_status(check_response(answer))
             send_message(bot, message)
 
         except Exception as error:
