@@ -1,5 +1,5 @@
-class CustomException(Exception):
-    """Кастомное исключение."""
+class EndPointException(Exception):
+    """Исключение эндпоинта."""
 
     def __init__(self, *args):
         """На случай отсутствия аргументов."""

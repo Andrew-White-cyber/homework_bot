@@ -8,7 +8,7 @@ from telegram import Bot
 import requests
 from dotenv import load_dotenv
 
-from exceptions import CustomException
+from exceptions import EndPointException
 
 load_dotenv()
 
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 def check_tokens():
     """Проверяем доступность токенов."""
-    return all([TELEGRAM_CHAT_ID, TELEGRAM_TOKEN, PRACTICUM_TOKEN])
+    return not all([TELEGRAM_CHAT_ID, TELEGRAM_TOKEN, PRACTICUM_TOKEN])
 
 
 def send_message(bot, message):
@@ -48,16 +48,16 @@ def send_message(bot, message):
 
 
 def get_api_answer(timestamp):
-    """Получаем ответ от сервиса яндекс-домашка."""
+    """Получаем ответ от сервиса Яндекс-Домашка."""
     url = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
     headers = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
     payload = {'from_date': timestamp}
     try:
         homework_statuses = requests.get(url, headers=headers, params=payload)
     except requests.RequestException:
-        raise Exception(f'Эндпоинт {url} не доступен!')
+        raise EndPointException(f'Эндпоинт {url} не доступен!')
     if homework_statuses.status_code != 200:
-        raise Exception(
+        raise EndPointException(
             f'Код ответа не 200, а {homework_statuses.status_code},'
             f'причина: {homework_statuses.reason}'
         )
